@@ -48,10 +48,10 @@ jobs:
           ~/arm-gnu/bin/arm-none-linux-gnueabihf-gcc --version | head -1
 
       - name: Build RetroArch
-        run: TOOLCHAIN_DIR=$HOME/arm-gnu pkg/mvsx/build.sh
+        run: TOOLCHAIN_DIR=$HOME/arm-gnu bash pkg/mvsx/build.sh
 
       - name: Build the filter plugins
-        run: TOOLCHAIN_DIR=$HOME/arm-gnu pkg/mvsx/build-filters.sh
+        run: TOOLCHAIN_DIR=$HOME/arm-gnu bash pkg/mvsx/build-filters.sh
 
       - name: Assemble the package
         id: package
@@ -62,7 +62,7 @@ jobs:
           else
             name="retroarch-mvsx-${GITHUB_SHA::10}"
           fi
-          TOOLCHAIN_DIR=$HOME/arm-gnu pkg/mvsx/package.sh "out/$name" zip
+          TOOLCHAIN_DIR=$HOME/arm-gnu bash pkg/mvsx/package.sh "out/$name" zip
           echo "name=$name" >> "$GITHUB_OUTPUT"
 
       - name: Upload the build artifact
