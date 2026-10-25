@@ -73,6 +73,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <limits.h>
 #include <unistd.h>
 #include <sys/types.h>
 
@@ -1402,7 +1403,7 @@ static unsigned sdl_mvsx_diag_sample_threads(
 
    while ((e = readdir(d)) && (n < max))
    {
-      char path[128];
+      char path[NAME_MAX + 32];  /* "/proc/self/task/<d_name>/stat" */
       char buf[512];
       char *p, *q;
       unsigned long ut, st;

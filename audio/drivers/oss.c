@@ -248,12 +248,14 @@ static void *oss_init(const char *device,
 
    return ossaudio;
 
+#if !defined(MVSX)
 error:
    close(ossaudio->fd);
    if (ossaudio)
       free(ossaudio);
    perror("ioctl");
    return NULL;
+#endif
 }
 
 #if defined(MVSX)
