@@ -43,7 +43,7 @@ from a shell script on a USB flash drive mounted at `/mnt/hdisk`.
 | `retroarch-mvsx-1.22.2-update/` + `.zip` | the **built package** (what goes on the drive). Reassembled by `_tools/pkg/package.sh`. |
 | `_tools/arm-gnu/` | Arm GNU 14.2 toolchain (`arm-none-linux-gnueabihf`, glibc 2.40) |
 | `_tools/msys2/` | MSYS2 used to run `make` |
-| `_tools/pkg/` | package sources: `package.sh`, `build.sh`, `build-filters.sh`, `README-MVSX.md`, `retroarch.cfg`, `retroarch.cfg.mvsx-additions`, `boot-usb.sh`, `info/` (patch + override-retire script). |
+| `_tools/pkg/` | **thin wrappers** (`build.sh`, `build-filters.sh`, `package.sh` exec the in-repo scripts) plus local copies of `README-MVSX.md`, `retroarch.cfg`, `retroarch.cfg.mvsx-additions`, `boot-usb.sh`, `info/`. The real sources are in the repo's `pkg/mvsx/` (see below); the local copies exist only for history and should be treated as read-only mirrors. |
 | the flash drive (a drive letter when plugged into the PC; `<drive>` below) | the cabinet's flash drive: `boot-usb.sh` at the root, `retroarch/` = `/mnt/hdisk/retroarch` |
 
 Source changes vs upstream v1.22.2 (all in the worktree, see
@@ -71,24 +71,36 @@ file) — keep both in sync when either changes, and push after.
 
 ## Build, package, ship
 
-```
-MSYSTEM=MSYS _tools/msys2/msys64/usr/bin/bash.exe -lc '
-  export MSYS2_ARG_CONV_EXCL="*"
-  cd <workspace>/RetroArch-1.22.2-mvsx
-  make -f Makefile.mvsx -j16'
-```
-`MSYS2_ARG_CONV_EXCL="*"` is mandatory (otherwise the `/mnt/hdisk/...`
-dynamic-linker path gets rewritten). Incremental builds take under a minute.
-`bash _tools/pkg/build.sh` wraps exactly this (exit status = make's) — use
-it; inline `bash.exe -lc '...'` with nested quotes broke twice. Chain the
-rest with `&&` only; a heredoc in the middle of a chain ends the chain.
+Everything the build and the package need is in the repository under
+`pkg/mvsx/` (SDL 1.2 headers, the device libraries to link against and to
+ship, launcher scripts, autoconfig, the cabinet's `retroarch.cfg`, the boot
+script, docs) plus the Arm GNU Toolchain 14.2.Rel1
+(`arm-none-linux-gnueabihf`), which is **not** in the repo:
 
-Then, from `retroarch/`:
-1. regenerate the patch: in the worktree `git add -N . && git diff HEAD -- . ':!retroarch' > ../_tools/pkg/info/retroarch-1.22.2-mvsx.patch; git reset -q`
-2. `bash _tools/pkg/package.sh retroarch-mvsx-1.22.2-update` (strips the binary, assembles lib/, filters/, launchers, config, boot script, README) and copy the patch into `retroarch-mvsx-1.22.2-update/info/`
-3. zip with **bsdtar**, not PowerShell (PowerShell writes backslash paths):
-   `_tools/msys2/msys64/usr/bin/bsdtar.exe -a -cf retroarch-mvsx-1.22.2-update.zip retroarch-mvsx-1.22.2-update`
-4. verify with `grep -c -a '<new log string>' retroarch-mvsx-1.22.2-update/bin/retroarch` (no `strings` on this PC).
+```
+TOOLCHAIN_DIR=<toolchain> pkg/mvsx/build.sh            # make -f Makefile.mvsx
+TOOLCHAIN_DIR=<toolchain> pkg/mvsx/build-filters.sh    # video + audio DSP plugins
+TOOLCHAIN_DIR=<toolchain> pkg/mvsx/package.sh <out> zip
+```
+
+Without `TOOLCHAIN_DIR` the scripts and `Makefile.mvsx` default to
+`<workspace>/_tools/arm-gnu` next to the repo; on Windows the scripts run
+make under MSYS2 (`<workspace>/_tools/msys2`, or `MSYS_BASH`) with
+`MSYS2_ARG_CONV_EXCL="*"` (mandatory, otherwise the `/mnt/hdisk/...`
+dynamic-linker path gets rewritten). The `_tools/pkg/*.sh` files are
+wrappers that exec the in-repo scripts, so the usual local commands are
+unchanged: `bash _tools/pkg/build.sh`, `bash _tools/pkg/package.sh
+retroarch-mvsx-1.22.2-update zip`. Objects are not flag-tracked: after a
+flags change `rm -rf obj-mvsx` first. Incremental builds take under a
+minute; a full build a few minutes. Keep chains strictly `&&`-linked (a
+heredoc in the middle of a chain ends it) and verify the stripped binary
+with `grep -c -a '<new log string>' <pkg>/bin/retroarch` (no `strings`).
+
+**CI**: `.github/workflows/MVSX.yml` (ubuntu-latest) downloads and caches
+the toolchain from developer.arm.com, runs the three scripts, uploads the
+zip as an artifact for every push to `mvsx-*`, and for tags `v*-mvsx*`
+creates a GitHub release with the zip (`gh release create`, notes from
+`pkg/mvsx/RELEASE-NOTES.md`). Release tag convention: `v1.22.2-mvsx.N`.
 
 Installing = copying the changed files onto the flash drive (usually just
 `retroarch\bin\retroarch`, sometimes `retroarch\retroarch.cfg` and
@@ -299,6 +311,15 @@ per-step hashes any more. The measurements are the record.
     not yet implemented. The NEON fx cost cannot be reduced much further
     on this SoC; the 16-bit-before-conversion idea is not obviously
     cheaper.
+21. **Published**: branch squashed to one commit (no local paths or
+    personal email anywhere in history), pushed to the fork. Then made
+    self-contained for CI: SDL headers, device libs, launchers, autoconfig
+    and the cabinet config moved into `pkg/mvsx/`; `Makefile.mvsx`
+    defaults point there; cross-platform `pkg/mvsx/{build,build-filters,
+    package}.sh`; `.github/workflows/MVSX.yml` builds artifacts and
+    releases; root `README.md` replaced with the MVSX one. Verified
+    locally: the in-repo build reproduces the drive's binary byte for
+    byte.
     Final state: 1280x512 direct rendering, 8:3 aspect, CRT look as
     above, CPU at 1.31 GHz, no CPU filter, menu on Start+Select.
 

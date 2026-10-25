@@ -1,6 +1,6 @@
 #########################################################################
-## RetroArch for the SNK Neo Geo MVSX / Arcade Stick Pro               ##
-## (Actions ATM7051, ARMv7 Cortex-A9 + NEON, glibc, SDL 1.2 fbcon)     ##
+## RetroArch for the SNK Neo Geo MVSX                                  ##
+## (Actions GS702C, 4x Cortex-A5 + NEON/VFPv4, glibc, SDL 1.2 fbcon)   ##
 ##                                                                     ##
 ## Cross-built with the Arm GNU Toolchain (arm-none-linux-gnueabihf).  ##
 ## The resulting binary expects its own glibc in /mnt/hdisk/retroarch/ ##
@@ -8,16 +8,17 @@
 #########################################################################
 
 # Toolchain / dependency locations (override on the command line)
-# Tools live next to this repository, in <workspace>/_tools (see
-# pkg/mvsx/DEVELOPMENT-NOTES.md). The native Windows toolchain needs
-# C:/ style paths even under MSYS, hence cygpath. Override with MVSX_TOOLS.
-MVSX_TOOLS     ?= $(shell cygpath -m "$(abspath $(CURDIR)/../_tools)" 2>/dev/null || echo "$(abspath $(CURDIR)/../_tools)")
-TOOLCHAIN_DIR  ?= $(MVSX_TOOLS)/arm-gnu
+# The toolchain defaults to <workspace>/_tools/arm-gnu next to this repository
+# (TOOLCHAIN_DIR overrides, as pkg/mvsx/build.sh does); the SDL headers and
+# the device libraries to link against are in pkg/mvsx. The native Windows
+# toolchain needs C:/ style paths even under MSYS, hence cygpath.
+MVSX_REPO      ?= $(shell cygpath -m "$(CURDIR)" 2>/dev/null || echo "$(CURDIR)")
+TOOLCHAIN_DIR  ?= $(MVSX_REPO)/../_tools/arm-gnu
 TOOLCHAIN_PFX  ?= $(TOOLCHAIN_DIR)/bin/arm-none-linux-gnueabihf-
 # SDL 1.2 headers (SDL/ subdirectory inside)
-SDL12_INC      ?= $(MVSX_TOOLS)/sdl12-include
+SDL12_INC      ?= $(MVSX_REPO)/pkg/mvsx/sdl12-include
 # Directory holding libSDL-1.2.so.0 (+ libts.so.0) taken from the device
-MVSX_STAGE_LIB ?= $(MVSX_TOOLS)/mvsx-stage-lib
+MVSX_STAGE_LIB ?= $(MVSX_REPO)/pkg/mvsx/device-lib
 # Where the package lives on the device
 MVSX_PREFIX    ?= /mnt/hdisk/retroarch
 

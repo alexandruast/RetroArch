@@ -272,26 +272,26 @@ achievements, online updater, FreeType fonts (RGUI uses its bitmap font).
 
 ## Rebuilding
 
-Everything needed is under `_tools/` in the workspace (no WSL or Docker
-required):
+The GitHub Actions workflow `.github/workflows/MVSX.yml` in the repository
+builds every push to an `mvsx-*` branch (the package zip is the run's
+artifact) and publishes a release for tags named `v1.22.2-mvsx.N`.
+
+Locally, on Linux or on Windows with MSYS2, with the Arm GNU Toolchain
+14.2.Rel1 for `arm-none-linux-gnueabihf` (the package ships that
+toolchain's glibc, so stay on a 14.2 release):
 
 ```
-MSYSTEM=MSYS _tools/msys2/msys64/usr/bin/bash.exe -lc '
-  export MSYS2_ARG_CONV_EXCL="*"
-  cd <workspace>/RetroArch-1.22.2-mvsx
-  make -f Makefile.mvsx -j16'
+TOOLCHAIN_DIR=<toolchain> pkg/mvsx/build.sh            # the binary
+TOOLCHAIN_DIR=<toolchain> pkg/mvsx/build-filters.sh    # the plugins
+TOOLCHAIN_DIR=<toolchain> pkg/mvsx/package.sh <out> zip
 ```
 
-`MSYS2_ARG_CONV_EXCL="*"` is required: without it MSYS rewrites the
-`/mnt/hdisk/...` dynamic-linker path into a Windows path. Filters:
-
-```
-make -C gfx/video_filters platform=unix compiler=<path>/arm-none-linux-gnueabihf-gcc \
-     extra_flags="-march=armv7-a -mtune=cortex-a9 -mfpu=neon -mfloat-abi=hard -O2" build
-make -C libretro-common/audio/dsp_filters ... (same arguments)
-```
-
-Then `_tools/pkg/package.sh <output dir>` assembles the package.
+Without `TOOLCHAIN_DIR` the scripts and `Makefile.mvsx` look for the
+toolchain in `<workspace>/_tools/arm-gnu` next to the repository (and, on
+Windows, for MSYS2 in `<workspace>/_tools/msys2`). The MSYS2 path
+conversion must be off (`MSYS2_ARG_CONV_EXCL="*"`, the scripts do that):
+otherwise MSYS rewrites the `/mnt/hdisk/...` dynamic-linker path that is
+baked into the binary.
 
 ## Source changes relative to upstream v1.22.2
 

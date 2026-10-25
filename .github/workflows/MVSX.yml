@@ -1,0 +1,82 @@
+name: MVSX
+
+# Cross-builds RetroArch for the Neo Geo MVSX cabinet and assembles the
+# flash-drive package. Every push to an mvsx-* branch produces a downloadable
+# build artifact; a tag of the form v1.22.2-mvsx.N publishes a GitHub release
+# with the package zip attached.
+
+on:
+  push:
+    branches: ['mvsx-*']
+    tags: ['v*-mvsx*']
+  pull_request:
+    branches: ['mvsx-*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TOOLCHAIN_VER: 14.2.rel1
+
+jobs:
+  build:
+    name: Build and package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Fetch the upstream tag (for the source patch in the package)
+        run: git fetch --no-tags --depth=1 origin +refs/tags/v1.22.2:refs/tags/v1.22.2 || true
+
+      - name: Cache the Arm GNU toolchain
+        id: toolchain
+        uses: actions/cache@v4
+        with:
+          path: ~/arm-gnu
+          key: arm-gnu-toolchain-${{ env.TOOLCHAIN_VER }}-x86_64-arm-none-linux-gnueabihf
+
+      - name: Download the Arm GNU toolchain
+        if: steps.toolchain.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          mkdir -p ~/arm-gnu
+          url="https://developer.arm.com/-/media/Files/downloads/gnu/${TOOLCHAIN_VER}/binrel/arm-gnu-toolchain-${TOOLCHAIN_VER}-x86_64-arm-none-linux-gnueabihf.tar.xz"
+          curl -fsSL --retry 3 -o /tmp/toolchain.tar.xz "$url"
+          tar -xJf /tmp/toolchain.tar.xz -C ~/arm-gnu --strip-components=1
+          ~/arm-gnu/bin/arm-none-linux-gnueabihf-gcc --version | head -1
+
+      - name: Build RetroArch
+        run: TOOLCHAIN_DIR=$HOME/arm-gnu pkg/mvsx/build.sh
+
+      - name: Build the filter plugins
+        run: TOOLCHAIN_DIR=$HOME/arm-gnu pkg/mvsx/build-filters.sh
+
+      - name: Assemble the package
+        id: package
+        run: |
+          set -e
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            name="retroarch-${GITHUB_REF_NAME}"
+          else
+            name="retroarch-mvsx-${GITHUB_SHA::10}"
+          fi
+          TOOLCHAIN_DIR=$HOME/arm-gnu pkg/mvsx/package.sh "out/$name" zip
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: out/${{ steps.package.outputs.name }}.zip
+          if-no-files-found: error
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "out/${{ steps.package.outputs.name }}.zip" \
+            --title "RetroArch $GITHUB_REF_NAME for the Neo Geo MVSX" \
+            --notes-file pkg/mvsx/RELEASE-NOTES.md

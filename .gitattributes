@@ -1,0 +1,4 @@
+pkg/mvsx/device-lib/* binary
+pkg/mvsx/*.sh text eol=lf
+pkg/mvsx/launchers/* text eol=lf
+pkg/mvsx/boot-usb.sh text eol=lf

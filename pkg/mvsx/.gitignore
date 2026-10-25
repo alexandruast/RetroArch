@@ -1,0 +1,6 @@
+# The repository ignores *.so everywhere (built plugins); the device
+# libraries here are inputs, not build outputs.
+!device-lib/*.so
+!device-lib/*.so.*
+!retroarch.cfg
+!autoconfig/
