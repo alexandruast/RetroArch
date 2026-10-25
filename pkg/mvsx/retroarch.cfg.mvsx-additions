@@ -1,0 +1,36 @@
+# Lines to add/adjust in /mnt/hdisk/retroarch/retroarch.cfg for the
+# RetroArch 1.22.2 MVSX build (the shipped retroarch.cfg has them already).
+
+# Filter plugins shipped with the package
+video_filter_dir = "~/retroarch/filters/video"
+audio_filter_dir = "~/retroarch/filters/audio"
+screenshot_directory = "~/retroarch/screenshots"
+
+# No SSL in this build and the buildbot is HTTPS-only: hide the updaters
+menu_show_online_updater = "false"
+menu_show_core_updater = "false"
+
+# Video driver: "sdl_mvsx" (NEON integer scaling, verified on the device);
+# "sdl" is the fallback that behaves like the 1.9.0 build.
+video_driver = "sdl_mvsx"
+
+# Use the framebuffer mode that boot-usb.sh sets (1280x512: half the panel
+# height, doubled vertically by the display engine). At 1280x1024 the
+# per-frame copy to the framebuffer alone takes ~22 ms on this SoC.
+video_fullscreen_x = "0"
+video_fullscreen_y = "0"
+
+# 8:3 = 4:3 in the half-height 1280x512 mode (framebuffer pixels are 1x2 on
+# the panel). Use 4:3 (index 0) again if you go back to 1280x720/1024.
+aspect_ratio_index = "14"
+
+# The panel is 60 Hz; the 2021 config said 30, which disables audio/video
+# sync fine-tuning. VRR mode fights the blocking audio clock on this device.
+video_refresh_rate = "60.000000"
+vrr_runloop_enable = "false"
+fps_show = "false"
+
+# No CPU filter by default (true colours, like the 1.9.0 build). For a CRT
+# look set "~/retroarch/filters/video/Scanline2x.filt" here or per core via
+# Quick Menu > Overrides; it darkens every second line to 75%.
+video_filter = ""

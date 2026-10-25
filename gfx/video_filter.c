@@ -360,7 +360,11 @@ static bool append_softfilter_plugs(rarch_softfilter_t *filt,
          dylib_load(list->elems[i].data);
 
       if (!lib)
+      {
+         RARCH_WARN("[SoftFilter] Could not load \"%s\": %s.\n",
+               list->elems[i].data, dylib_error());
          continue;
+      }
 
       cb = (softfilter_get_implementation_t)
          dylib_proc(lib, "softfilter_get_implementation");

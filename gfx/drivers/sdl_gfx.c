@@ -278,8 +278,16 @@ static void *sdl_gfx_init(const video_info_t *video,
    if (!video->fullscreen)
       RARCH_LOG("[SDL] Creating window @ %ux%u.\n", video->width, video->height);
 
+#if defined(MVSX)
+   /* MVSX/ASP framebuffer: draw into a shadow surface, SDL copies it
+    * to /dev/fb0 on flip (direct HW surface access is slow and
+    * double buffering is not available on the Actions fb driver) */
+   vid->screen = SDL_SetVideoMode(video->width, video->height, 32,
+         SDL_SWSURFACE | SDL_HWACCEL | (video->fullscreen ? SDL_FULLSCREEN : 0));
+#else
    vid->screen = SDL_SetVideoMode(video->width, video->height, 32,
          SDL_HWSURFACE | SDL_HWACCEL | SDL_DOUBLEBUF | (video->fullscreen ? SDL_FULLSCREEN : 0));
+#endif
 
    /* We assume that SDL chooses ARGB8888.
     * Assuming this simplifies the driver *a ton*.
@@ -323,9 +331,26 @@ static void *sdl_gfx_init(const video_info_t *video,
    vid->scaler.scaler_type      = video->smooth ? SCALER_TYPE_BILINEAR : SCALER_TYPE_POINT;
    vid->scaler.in_fmt           = video->rgb32 ? SCALER_FMT_ARGB8888 : SCALER_FMT_RGB565;
    vid->scaler.out_fmt          = SCALER_FMT_ARGB8888;
+#if defined(MVSX)
+   /* The MVSX panel is BGR ordered (red in the low byte) but the
+    * Actions fb driver reports standard RGB masks, so swap
+    * unconditionally like acmeplus' 1.9.0 build, unless MVSX_FB_BGR=0 */
+   {
+      const char *env = getenv("MVSX_FB_BGR");
+      if ((!env || (atoi(env) != 0)) || (vid->screen->format->Rshift == 0))
+      {
+         RARCH_LOG("[SDL] BGR framebuffer, using ABGR8888 output.\n");
+         vid->scaler.out_fmt    = SCALER_FMT_ABGR8888;
+      }
+   }
+#endif
 
    vid->menu.scaler             = vid->scaler;
+#if defined(MVSX)
+   vid->menu.scaler.scaler_type = SCALER_TYPE_POINT;
+#else
    vid->menu.scaler.scaler_type = SCALER_TYPE_BILINEAR;
+#endif
 
    vid->menu.frame              = SDL_ConvertSurface(
          vid->screen, vid->screen->format, vid->screen->flags | SDL_SRCALPHA);

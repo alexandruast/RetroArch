@@ -242,9 +242,11 @@ static void *phosphor2x_generic_create(const struct softfilter_config *config,
       free(filt);
       return NULL;
    }
-   /* Apparently the code is not thread-safe,
-    * so force single threaded operation... */
-   filt->threads        = 1;
+   /* Each output row pair depends only on its own input row and the
+    * bleed/bloom routines only read the lookup tables below, so the
+    * row slices handed out by phosphor2x_generic_packets() can run
+    * in parallel. (Upstream forces a single thread here.) */
+   filt->threads        = (threads > 0) ? threads : 1;
    filt->in_fmt         = in_fmt;
 
    filt->phosphor_bleed = 0.78;

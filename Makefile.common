@@ -1637,6 +1637,11 @@ else ifeq ($(HAVE_SDL), 1)
    OBJ += gfx/drivers/sdl_gfx.o
    DEF_FLAGS += $(SDL_CFLAGS)
    LIBS += $(SDL_LIBS)
+
+   ifeq ($(MVSX), 1)
+      OBJ += gfx/drivers/sdl_mvsx_gfx.o              gfx/drivers/mvsx/scaler_neon.o
+      DEF_FLAGS += -DMVSX
+   endif
 else ifeq ($(HAVE_SDL_DINGUX), 1)
    HAVE_SDL_COMMON = 1
    DEF_FLAGS += -DHAVE_SDL -DHAVE_SDL_DINGUX
