@@ -150,7 +150,12 @@ channel; use it before guessing.
 
 Other env switches (set with `export` in `boot-usb.sh`): `MVSX_FB_BGR=0`,
 `MVSX_SDL_HWSURFACE=1`, `MVSX_SDL_DOUBLEBUF=1`, `MVSX_FB_BPP=16`,
-`MVSX_AUDIO_SETFMT=1`, `MVSX_AUDIO_OUT_MODE`, `MVSX_AUDIO_SPEAKER`.
+`MVSX_AUDIO_SETFMT=1`, `MVSX_AUDIO_OUT_MODE`, `MVSX_AUDIO_SPEAKER`,
+`MVSX_VOLUME_KNOB=0` (disables the cabinet volume knob: `oss.c` polls
+`/sys/class/volume/value` every ~200 ms of audio and sets the level with
+`SOUND_MIXER_WRITE_VOLUME` on `/dev/snd/actsnd`, same mapping/table as
+hylostash `mvsnjemu`; readings above 90 are ignored as glitches (real range
+2..83, a 175 was seen once); changes are logged as `[OSS] Volume knob: ...`).
 `MVSX_MENU_HIRES=0` restores the stock 240-line RGUI; by default `rgui.c` draws
 the menu on a 640x512 canvas (exactly 2x1 into the 1280x512 framebuffer =
 square pixels, no repeated rows; 640x480 repeated every 15th row, which the

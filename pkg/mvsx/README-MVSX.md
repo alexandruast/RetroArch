@@ -222,6 +222,12 @@ device (October 2026):
   default: on the MVSX they coincided with joypad input dying, and the
   speakers work with the device's default routing. They can be sent on
   request with `MVSX_AUDIO_OUT_MODE=<0..5>` / `MVSX_AUDIO_SPEAKER=<0|1>`.
+* The cabinet's volume knob works as in the stock software: its position
+  is read from `/sys/class/volume/value` every ~200 ms of audio and the
+  level is set with `SOUND_MIXER_WRITE_VOLUME` on the sound device, with
+  the same mapping as the stock emulator (fully down mutes). Readings
+  outside the knob's range are ignored. Changes are logged as
+  `[OSS] Volume knob: ...`; `MVSX_VOLUME_KNOB=0` turns it off.
 * `SNDCTL_DSP_RESET` is never issued (pause just stops feeding the
   device): after a reset the driver refuses every write with EPERM,
   which was the "audio stops after opening the menu" problem of the

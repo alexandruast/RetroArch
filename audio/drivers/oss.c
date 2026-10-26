@@ -58,6 +58,10 @@ typedef struct oss_audio
    unsigned rate;
    unsigned latency;
    unsigned err_count;
+   int knob_level;
+   unsigned knob_glitches;
+   bool knob_off;
+   size_t knob_bytes;
    char device[256];
 #endif
 } oss_audio_t;
@@ -159,6 +163,83 @@ static int oss_mvsx_configure(oss_audio_t *ossaudio)
    return new_rate;
 }
 
+/* Cabinet volume knob. The kernel exposes its position in sysfs and
+ * the stock software (SNK_MAIN, hylostash mvsnjemu) polls it every
+ * 200 ms and sets the hardware level with the standard OSS mixer
+ * ioctl on the sound device; nothing does that for RetroArch, so the
+ * knob had no effect. Same mapping as mvsnjemu: level 0..35 from
+ * 35 - value / 2.325, level 0 mutes, the rest index this table.
+ * MVSX_VOLUME_KNOB=0 turns it off. */
+#define OSS_MVSX_KNOB_PATH "/sys/class/volume/value"
+/* The knob reads 2 (loudest) .. 83 (muted); a stray reading far
+ * outside that (175 was seen once) would blip the volume to mute
+ * until the next poll, so anything above this is ignored. */
+#define OSS_MVSX_KNOB_MAX_VALUE 90
+
+static const int oss_mvsx_knob_mixer[35] = {
+   0x0a0a, 0x0e0e, 0x1010, 0x1212, 0x1414, 0x1616,
+   0x1717, 0x1717, 0x1818, 0x1818, 0x1919, 0x1919,
+   0x1a1a, 0x1a1a, 0x1b1b, 0x1b1b, 0x1c1c, 0x1c1c,
+   0x1d1d, 0x1d1d, 0x1e1e, 0x1e1e, 0x1f1f, 0x1f1f,
+   0x2020, 0x2020, 0x2121, 0x2121, 0x2222, 0x2222,
+   0x2323, 0x2323, 0x2424, 0x2424, 0x2525
+};
+
+static void oss_mvsx_knob_poll(oss_audio_t *ossaudio)
+{
+   char buf[20];
+   ssize_t n;
+   int value, level, mixer;
+   int fd;
+
+   if (ossaudio->knob_off)
+      return;
+
+   if ((fd = open(OSS_MVSX_KNOB_PATH, O_RDONLY)) < 0)
+   {
+      RARCH_WARN("[OSS] Volume knob: cannot open \"%s\": %s. Knob disabled.\n",
+            OSS_MVSX_KNOB_PATH, strerror(errno));
+      ossaudio->knob_off = true;
+      return;
+   }
+   n = read(fd, buf, sizeof(buf) - 1);
+   close(fd);
+   if (n <= 0)
+      return;
+   buf[n] = '\0';
+
+   value = (int)strtol(buf, NULL, 10);
+   if (value < 0 || value > OSS_MVSX_KNOB_MAX_VALUE)
+   {
+      ossaudio->knob_glitches++;
+      if (ossaudio->knob_glitches <= 5)
+         RARCH_LOG("[OSS] Volume knob: ignoring out-of-range value %d (%u so far).\n",
+               value, ossaudio->knob_glitches);
+      return;
+   }
+   level = 35 - (int)((float)value / 2.325f);
+   if (level > 35)
+      level = 35;
+   if (level < 0)
+      level = 0;
+
+   if (level == ossaudio->knob_level)
+      return;
+
+   mixer = level ? oss_mvsx_knob_mixer[level - 1] : 0;
+   if (ioctl(ossaudio->fd, SOUND_MIXER_WRITE_VOLUME, &mixer) < 0)
+   {
+      RARCH_WARN("[OSS] Volume knob: SOUND_MIXER_WRITE_VOLUME(0x%04x) failed: %s. Knob disabled.\n",
+            mixer, strerror(errno));
+      ossaudio->knob_off = true;
+      return;
+   }
+
+   RARCH_LOG("[OSS] Volume knob: value %d -> level %d/35 (mixer 0x%04x).\n",
+         value, level, mixer);
+   ossaudio->knob_level = level;
+}
+
 /* The Actions driver refuses every write (EPERM) once it has been
  * reset or otherwise upset; the only way back is a fresh open. */
 static bool oss_mvsx_reopen(oss_audio_t *ossaudio)
@@ -177,6 +258,8 @@ static bool oss_mvsx_reopen(oss_audio_t *ossaudio)
    RARCH_LOG("[OSS] Reopened device \"%s\".\n", ossaudio->device);
    oss_mvsx_set_output_path(ossaudio->fd);
    oss_mvsx_configure(ossaudio);
+   ossaudio->knob_level = -1;
+   oss_mvsx_knob_poll(ossaudio);
    return true;
 }
 #endif
@@ -211,6 +294,15 @@ static void *oss_init(const char *device,
 
    oss_mvsx_set_output_path(ossaudio->fd);
    new_rate = oss_mvsx_configure(ossaudio);
+
+   ossaudio->knob_level = -1;
+   {
+      const char *env    = getenv("MVSX_VOLUME_KNOB");
+      ossaudio->knob_off = env && atoi(env) == 0;
+   }
+   if (ossaudio->knob_off)
+      RARCH_LOG("[OSS] Volume knob disabled (MVSX_VOLUME_KNOB=0).\n");
+   oss_mvsx_knob_poll(ossaudio);
 
    /* Blocking writes, as in the 1.9.0 build: the Actions driver
     * does not implement O_NONBLOCK (it returns ERESTARTSYS). */
@@ -281,6 +373,15 @@ static ssize_t oss_write(void *data, const void *s, size_t len)
     * video instead of by the audio device). */
    if (ossaudio->nonblock)
       return (ssize_t)len;
+
+   /* Poll the volume knob every ~200 ms of audio (S16 stereo),
+    * like the stock software does */
+   ossaudio->knob_bytes += len;
+   if (ossaudio->knob_bytes >= ossaudio->rate * 4 / 5)
+   {
+      ossaudio->knob_bytes = 0;
+      oss_mvsx_knob_poll(ossaudio);
+   }
 
    while (written < len)
    {
