@@ -125,6 +125,14 @@ mode), `video_refresh_rate = 60`, `vrr_runloop_enable = false`,
 `video_scale_integer = true`, `global_core_options = true`. RetroArch
 rewrites the file on clean exit (`config_save_on_exit`).
 
+**Decided (2026-10-26): keep integer scaling for Neo Geo.** 304x224 shows as
+1194x448 (integer 2x, 4:3) with a ~2 cm border all round. The user wants the
+authentic look: no stretch and even scanlines. Even scanlines need an
+integer vertical scale, 3x (672) does not fit in 512 and 4:3 at 448 lines is
+1194 wide, so this is already the largest correct picture. Do not propose
+filling the screen again; if ever wanted, it is `video_scale_integer = false`
+in a folder override `config/FinalBurn Neo/roms.cfg` (uneven scanlines).
+
 The five 2021 full-config core overrides (`config/<Core>/<Core>.cfg` for
 FinalBurn Neo, PicoDrive, PCSX-ReARMed, Beetle NeoPop, Beetle SuperGrafx)
 were deleted from the drive on 2026-10-25; originals remain in
@@ -143,6 +151,12 @@ channel; use it before guessing.
 Other env switches (set with `export` in `boot-usb.sh`): `MVSX_FB_BGR=0`,
 `MVSX_SDL_HWSURFACE=1`, `MVSX_SDL_DOUBLEBUF=1`, `MVSX_FB_BPP=16`,
 `MVSX_AUDIO_SETFMT=1`, `MVSX_AUDIO_OUT_MODE`, `MVSX_AUDIO_SPEAKER`.
+`MVSX_MENU_HIRES=0` restores the stock 240-line RGUI; by default `rgui.c` draws
+the menu on a 640x512 canvas (exactly 2x1 into the 1280x512 framebuffer =
+square pixels, no repeated rows; 640x480 repeated every 15th row, which the
+scanline pass then darkened = stray pixels in text) and scales the inline
+thumbnail cap with it (114x91 -> 240x223), since the 240-line menu made
+playlist art unreadable.
 
 ## History (what was done, in order)
 

@@ -165,7 +165,11 @@ Environment overrides for experimenting from the launcher script:
 an SDL shadow surface instead of straight into `/dev/fb0`,
 `MVSX_SDL_DOUBLEBUF=1` requests page flipping, `MVSX_FB_BGR=0` disables
 the red/blue swap, `MVSX_VIDEO_STATS=0` turns off the diagnostics below,
-`MVSX_SCANLINES=<percent>` draws scanlines while scaling (see below).
+`MVSX_SCANLINES=<percent>` draws scanlines while scaling (see below),
+`MVSX_MENU_HIRES=0` brings back the stock 320x240 menu. By default the
+menu is drawn at 640x512, exactly 2x1 into the 1280x512 mode (square
+pixels, even text), which also gives playlist thumbnails four times the
+pixels of the stock menu.
 
 ### CRT look (scanlines, boost, mask, blur)
 

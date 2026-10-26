@@ -84,7 +84,13 @@
 
 #define RGUI_MIN_FB_HEIGHT 192
 #define RGUI_MIN_FB_WIDTH 256
+#if defined(MVSX)
+/* MVSX: the menu canvas is 512 lines high (see rgui_mvsx_fb_height()),
+ * which needs up to 856 pixels of width at the wider aspect ratios */
+#define RGUI_MAX_FB_WIDTH 856
+#else
 #define RGUI_MAX_FB_WIDTH 560
+#endif
 
 #if defined(DINGUX)
 #if defined(RS90) && !defined(MIYOO)
@@ -6062,6 +6068,24 @@ static void rgui_update_menu_viewport(
    rgui->menu_video_settings.vp.y = (vp.full_height - rgui->menu_video_settings.vp.height) / 2;
 }
 
+#if defined(MVSX)
+/* MVSX: draw the menu on a 640x512 canvas instead of 320x240. The
+ * 1280x512 framebuffer (doubled vertically to the 1280x1024 panel)
+ * shows it at exactly 2x1, i.e. square pixels with no repeated rows:
+ * 640x480 had every 15th row repeated, which made stray lines in the
+ * text (and the driver's scanline pass darkens repeated rows). Text
+ * is half the stock size and the inline thumbnail box goes from
+ * 114x91 to 240x223. MVSX_MENU_HIRES=0 restores the stock menu. */
+#define RGUI_MVSX_HIRES_WIDTH  640
+#define RGUI_MVSX_HIRES_HEIGHT 512
+
+static unsigned rgui_mvsx_fb_height(void)
+{
+   const char *env = getenv("MVSX_MENU_HIRES");
+   return (env && atoi(env) == 0) ? 240 : RGUI_MVSX_HIRES_HEIGHT;
+}
+#endif
+
 static bool rgui_set_aspect_ratio(
       rgui_t *rgui,
       gfx_display_t *p_disp,
@@ -6121,7 +6145,11 @@ static bool rgui_set_aspect_ratio(
    /* If window height is less than RGUI default
     * height of 240, allow the frame buffer to
     * 'shrink' to a minimum height of 192 */
+#if defined(MVSX)
+   rgui->frame_buf.height = rgui_mvsx_fb_height();
+#else
    rgui->frame_buf.height = 240;
+#endif
    video_driver_get_viewport_info(&vp);
    if (vp.full_height < rgui->frame_buf.height)
       rgui->frame_buf.height = (vp.full_height > RGUI_MIN_FB_HEIGHT)
@@ -6263,6 +6291,10 @@ static bool rgui_set_aspect_ratio(
          /* 4:3 */
          if (rgui->frame_buf.height == 240)
             rgui->frame_buf.width = 320;
+#if defined(MVSX)
+         else if (rgui->frame_buf.height == RGUI_MVSX_HIRES_HEIGHT)
+            rgui->frame_buf.width = RGUI_MVSX_HIRES_WIDTH;
+#endif
          else
             rgui->frame_buf.width = RGUI_ROUND_FB_WIDTH(
                   ( 4.0f / 3.0f)  * (float)rgui->frame_buf.height);
@@ -6422,8 +6454,15 @@ static bool rgui_set_aspect_ratio(
 
    /* Allocate mini thumbnail buffers */
    mini_thumbnail_term_width            = (unsigned)((float)rgui->term_layout.width * (2.0f / 5.0f));
+#if defined(MVSX)
+   /* Scale the 19-column cap with the canvas height, or a taller
+    * canvas only shrinks the thumbnails */
+   if (mini_thumbnail_term_width > 19 * rgui->frame_buf.height / 240)
+      mini_thumbnail_term_width         = 19 * rgui->frame_buf.height / 240;
+#else
    if (mini_thumbnail_term_width > 19)
       mini_thumbnail_term_width         = 19;
+#endif
    rgui->mini_thumbnail_max_width       = mini_thumbnail_term_width * rgui->font_width_stride;
    rgui->mini_thumbnail_max_height      = (unsigned)((rgui->term_layout.height * rgui->font_height_stride) * 0.5f) - 2;
 
